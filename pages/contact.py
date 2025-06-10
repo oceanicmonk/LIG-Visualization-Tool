@@ -1,24 +1,23 @@
 import streamlit as st
 
-st.set_page_config(page_title="Contact Us - LIG Visualization Tool", layout="wide")
+st.set_page_config(page_title="Contact - LIG Visualization Tool", layout="wide")
 
 st.title("Contact Us")
 st.markdown("""
-We'd love to hear from you! Reach out for support, feedback, or inquiries about the LIG Visualization Tool.
+We’d love to hear from you! Reach out with any questions, feedback, or support requests.
 
-- **Email**: support@ligviz.com
-- **Phone**: +91 123 456 7890
-- **Address**: 123 Innovation Hub, Bengaluru, Karnataka, India
+**Contact Information**  
+- **Name**: Serene Glade  
+- **Email**: [oceanicmonk@gmail.com](mailto:oceanicmonk@gmail.com)  
+- **Phone**: +91 9745059169  
+- **Address**: Ambalaparambil, Kerala-676509, India  
+- **Website**: [https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/](https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/)
 
-For payment-related issues, please include your email and transaction ID.
+**Support**  
+For technical issues or inquiries, please email us or call during business hours (9 AM–5 PM IST, Monday–Friday).
+
+**Follow Us**  
+- [GitHub](https://github.com/oceanicmonk)  
+
+Thank you for using the LIG Visualization Tool!
 """)
-
-st.subheader("Contact Form")
-with st.form("contact_form"):
-    name = st.text_input("Name")
-    email = st.text_input("Email")
-    message = st.text_area("Message")
-    submitted = st.form_submit_button("Submit")
-    if submitted:
-        st.success("Thank you for your message! We'll respond soon.")
-        

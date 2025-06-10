@@ -52,28 +52,37 @@ def solve_log_point(c, func=f1, bounds=[np.e + 0.1, np.exp(np.e)]):
     def equation(x): return log(func(x)) - c
     try:
         return float(brentq(equation, bounds[0], bounds[1], xtol=1e-6))
-    except:
+    except Exception as e:
+        st.write(f"DEBUG: solve_log_point failed: {str(e)}")
         return None
 
 def log_distance(x_i, x_j, func=f1, kappa=1e6):
-    ln_fi = log(func(x_i))
-    ln_fj = log(func(x_j))
-    delta = ln_fi - ln_fj
-    theta = 1 / (1 + mp.exp(-kappa * delta))
-    return float(log(mp.exp(delta) * theta + mp.exp(-delta) * (1 - theta)))
+    try:
+        ln_fi = log(func(x_i))
+        ln_fj = log(func(x_j))
+        delta = ln_fi - ln_fj
+        theta = 1 / (1 + mp.exp(-kappa * delta))
+        return float(log(mp.exp(delta) * theta + mp.exp(-delta) * (1 - theta)))
+    except Exception as e:
+        st.write(f"DEBUG: log_distance failed: {str(e)}")
+        return float('inf')
 
 def generate_log_polygon(c_values, func=f1):
+    st.write("DEBUG: Starting generate_log_polygon")
     points = [solve_log_point(c, func) for c in c_values]
     if None in points:
+        st.write("DEBUG: generate_log_polygon failed: None in points")
         return None, None, None
     max_c = max(abs(c) for c in c_values)
     max_d = log(mp.exp(log(max_c + log(2))))
     edges = [(points[i], points[j]) for i in range(len(points)) for j in range(i+1, len(points))
              if log_distance(points[i], points[j], func) <= max_d]
     distances = [log_distance(p1, p2, func) for p1, p2 in edges]
+    st.write("DEBUG: generate_log_polygon completed")
     return points, edges, distances
 
 def generate_log_cycle(k_start, num_points, delta=log(2), q=None):
+    st.write("DEBUG: Starting generate_log_cycle")
     if q:
         func = lambda x: q_log(x, q)
         points = []
@@ -82,7 +91,8 @@ def generate_log_cycle(k_start, num_points, delta=log(2), q=None):
             try:
                 x = float(brentq(lambda x: func(x) - k, np.e + 0.1, np.exp(np.e), xtol=1e-6))
                 points.append(x)
-            except:
+            except Exception as e:
+                st.write(f"DEBUG: generate_log_cycle failed at point {i}: {str(e)}")
                 return None, None, None
     else:
         zeta = lambda x: log((log(x) / log(log(x))) * 
@@ -93,44 +103,61 @@ def generate_log_cycle(k_start, num_points, delta=log(2), q=None):
             try:
                 x = float(brentq(lambda x: zeta(x) - k, np.e + 0.1, np.exp(np.e), xtol=1e-6))
                 points.append(x)
-            except:
+            except Exception as e:
+                st.write(f"DEBUG: generate_log_cycle failed at point {i}: {str(e)}")
                 return None, None, None
     edges = [(points[i], points[i+1]) for i in range(len(points)-1)] + [(points[-1], points[0])]
     distances = [log_distance(p1, p2, f1) for p1, p2 in edges]
+    st.write("DEBUG: generate_log_cycle completed")
     return points, edges, distances
 
 def generate_log_surface(c1, c2, func1=f1, func2=f2, n_points=100):
+    st.write("DEBUG: Starting generate_log_surface")
     points = []
     for x in np.linspace(np.e + 0.1, np.exp(np.e), n_points):
-        if abs(log(func1(x)) - c1) < log(1.2) and abs(log(func2(x)) - c2) < log(1.2):
-            points.append([x, float(func1(x)), float(func2(x))])
+        try:
+            if abs(log(func1(x)) - c1) < log(1.2) and abs(log(func2(x)) - c2) < log(1.2):
+                points.append([x, float(func1(x)), float(func2(x))])
+        except Exception as e:
+            st.write(f"DEBUG: generate_log_surface failed at x={x}: {str(e)}")
+    st.write("DEBUG: generate_log_surface completed")
     return points, None, None
 
 def generate_log_volume(c1, c2, c3, func1=f1, func2=f2, func3=f3, n_points=100):
+    st.write("DEBUG: Starting generate_log_volume")
     points = []
     for x in np.linspace(np.e + 0.1, np.exp(np.e), n_points):
-        if all(abs(log(f(x)) - c) < log(1.2) for f, c in [(func1, c1), (func2, c2), (func3, c3)]):
-            points.append([x, float(func1(x)), float(func2(x))])
+        try:
+            if all(abs(log(f(x)) - c) < log(1.2) for f, c in [(func1, c1), (func2, c2), (func3, c3)]):
+                points.append([x, float(func1(x)), float(func2(x))])
+        except Exception as e:
+            st.write(f"DEBUG: generate_log_volume failed at x={x}: {str(e)}")
+    st.write("DEBUG: generate_log_volume completed")
     return points, None, None
 
 def transform_log_point(x, C, weights=[1, 0, 0], funcs=[f1, f2, f3]):
-    h_x = mp.prod([f(x)**w for f, w in zip(funcs, weights)])
-    return float(exp(log(h_x) * log(C) / log(mp.exp(mp.e))))
+    try:
+        h_x = mp.prod([f(x)**w for f, w in zip(funcs, weights)])
+        return float(exp(log(h_x) * log(C) / log(mp.exp(mp.e))))
+    except Exception as e:
+        st.write(f"DEBUG: transform_log_point failed: {str(e)}")
+        return x
 
 # Sidebar
 st.sidebar.title("LIG Visualization Tool")
 st.sidebar.markdown("""
 A novel geometry based on logarithmic operations. Explore log-points, structures, and transformations!
-- **Free**: 50 trials/month, 2D visualizations.
-- **Premium**: Unlimited trials, 3D visualizations, animations, reports.
+- **Free**: 50 trials/month, 2D/3D visualizations, animations.
+- **Premium**: Unlimited trials, downloadable reports.
+- [Contact](https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/contact) | [Privacy Policy](https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/privacy_policy) | [Terms](https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/terms) | [Refund Policy](https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/refund_policy)
 """)
-st.sidebar.markdown("[Contact](/contact) | [Privacy Policy](/privacy_policy) | [Terms](/terms)")
 
 # Main UI
 st.title("LIG Visualization Tool 📐")
 st.markdown("""
 **Explore Logarithmic Intrinsic Geometry!**
 Create non-spatial structures using logarithmic operations, with applications in computational geometry, information theory, and more.
+Visit us at [https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/](https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/).
 """)
 
 # Inputs
@@ -141,7 +168,7 @@ c_values = st.text_input("Constants (comma-separated, e.g., 1,1.2,1.4)", "1,1.2,
 q_value = st.number_input("Q-Logarithm Parameter (for cycles)", min_value=0.1, max_value=2.0, value=1.0, disabled=structure_type != "Log-Cycle")
 C_transform = st.number_input("Transformation Constant C", min_value=np.e, max_value=np.exp(np.e), value=np.e)
 weights = st.text_input("Transformation Weights (e.g., 1,0,0)", "1,0,0")
-animate_transform = st.checkbox("Animate Transformation (Premium)", disabled=not st.session_state.get("razorpay_payment_id"))
+animate_transform = st.checkbox("Animate Transformation", value=False)
 
 # Trial Tracking
 trial_count = track_trial()
@@ -153,7 +180,7 @@ try:
     key_id = st.secrets["razorpay"]["key_id"]
     key_secret = st.secrets["razorpay"]["key_secret"]
 except (KeyError, AttributeError):
-    st.warning("Razorpay secrets not found in .streamlit/secrets.toml. Using test keys for local testing.")
+    st.warning("Razorpay secrets not found. Using test keys for local testing.")
     key_id = "test_key_id"
     key_secret = "test_key_secret"
 
@@ -166,16 +193,18 @@ if "razorpay_client" not in st.session_state:
 
 # Generate
 st.write("DEBUG: Rendering Generate section")
-if st.checkbox("Bypass Premium for Testing (Local Only)"):
-    st.session_state["razorpay_payment_id"] = "test_premium"
+st.write(f"DEBUG: Trial count: {trial_count}, Premium: {bool(st.session_state.get('razorpay_payment_id'))}")
 if st.button("Generate", type="primary"):
+    st.write("DEBUG: Generate button clicked")
     if trial_count > 50 and not st.session_state.get("razorpay_payment_id"):
-        st.error("Trial limit reached. Upgrade to Premium for unlimited trials and advanced features.")
+        st.error("Trial limit reached. Upgrade to Premium for unlimited trials and downloadable reports.")
+        st.write("DEBUG: Trial limit exceeded")
     else:
         try:
             c_values = [float(c) for c in c_values.split(",")]
             func = {"f1": f1, "f2": f2, "f3": f3}[func_choice.split(":")[0]]
             weights = [float(w) for w in weights.split(",")]
+            st.write("DEBUG: Inputs parsed successfully")
 
             if structure_type == "Log-Polygon":
                 points, edges, distances = generate_log_polygon(c_values, func)
@@ -192,40 +221,43 @@ if st.button("Generate", type="primary"):
                     nx.draw_networkx_edge_labels(G, pos, {(u, v): f"{log_distance(u, v, func):.3f}" for u, v in edges}, ax=ax)
                     st.pyplot(fig)
                     plt.close(fig)
+                    st.write("DEBUG: 2D visualization rendered for Log-Polygon")
 
-                    # Premium Features
-                    if st.session_state.get("razorpay_payment_id"):
-                        # 3D Visualization
-                        pos_3d = nx.spring_layout(G, dim=3, seed=42)
-                        x = [pos_3d[p][0] for p in points]
-                        y = [pos_3d[p][1] for p in points]
-                        z = [pos_3d[p][2] for p in points]
-                        fig_3d = go.Figure(data=[
-                            go.Scatter3d(x=x, y=y, z=z, mode='markers+lines+text', text=[f"{p:.3f}" for p in points],
-                                         marker=dict(size=8, color='#2196F3'), line=dict(color='gray'))
-                        ])
-                        fig_3d.update_layout(title="3D Log-Polygon", scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))
+                    # 3D Visualization
+                    pos_3d = nx.spring_layout(G, dim=3, seed=42)
+                    x = [pos_3d[p][0] for p in points]
+                    y = [pos_3d[p][1] for p in points]
+                    z = [pos_3d[p][2] for p in points]
+                    fig_3d = go.Figure(data=[
+                        go.Scatter3d(x=x, y=y, z=z, mode='markers+lines+text', text=[f"{p:.3f}" for p in points],
+                                     marker=dict(size=8, color='#2196F3'), line=dict(color='gray'))
+                    ])
+                    fig_3d.update_layout(title="3D Log-Polygon", scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))
+                    st.plotly_chart(fig_3d)
+                    st.write("DEBUG: 3D visualization rendered for Log-Polygon")
+
+                    # Transformation
+                    transformed_points = [transform_log_point(p, C_transform, weights) for p in points]
+                    st.markdown(f"**Transformed Points**: {transformed_points}")
+                    st.write("DEBUG: Transformation computed for Log-Polygon")
+
+                    # Animation
+                    if animate_transform:
+                        frames = []
+                        for t in np.linspace(0, 1, 10):
+                            interp_points = [p + t * (tp - p) for p, tp in zip(points, transformed_points)]
+                            frames.append(go.Frame(data=[
+                                go.Scatter3d(x=[pos_3d[p][0] for p in interp_points],
+                                             y=[pos_3d[p][1] for p in interp_points],
+                                             z=[pos_3d[p][2] for p in interp_points],
+                                             mode='markers+lines')
+                            ]))
+                        fig_3d.update(frames=frames)
                         st.plotly_chart(fig_3d)
+                        st.write("DEBUG: Animation rendered for Log-Polygon")
 
-                        # Transformation
-                        transformed_points = [transform_log_point(p, C_transform, weights) for p in points]
-                        st.markdown(f"**Transformed Points**: {transformed_points}")
-
-                        # Animation
-                        if animate_transform:
-                            frames = []
-                            for t in np.linspace(0, 1, 10):
-                                interp_points = [p + t * (tp - p) for p, tp in zip(points, transformed_points)]
-                                frames.append(go.Frame(data=[
-                                    go.Scatter3d(x=[pos_3d[p][0] for p in interp_points],
-                                                 y=[pos_3d[p][1] for p in interp_points],
-                                                 z=[pos_3d[p][2] for p in interp_points],
-                                                 mode='markers+lines')
-                                ]))
-                            fig_3d.update(frames=frames)
-                            st.plotly_chart(fig_3d)
-
-                        # Report
+                    # Report (Premium only)
+                    if st.session_state.get("razorpay_payment_id"):
                         report = f"""LIG Visualization Report
 Structure: {structure_type}
 Function: {func_choice}
@@ -233,6 +265,10 @@ Points: {points}
 Max Distance: {max(distances, default=0):.3f}
 Transformed Points: {transformed_points}"""
                         st.download_button("Download Report", report, "lig_report.txt", mime="text/plain")
+                        st.write("DEBUG: Report download button rendered for Log-Polygon")
+                    else:
+                        st.info("Upgrade to Premium to download reports.")
+                        st.write("DEBUG: Premium report prompt displayed for Log-Polygon")
 
             elif structure_type == "Log-Cycle":
                 q = q_value if q_value != 1.0 else None
@@ -249,27 +285,34 @@ Transformed Points: {transformed_points}"""
                     nx.draw(G, pos, with_labels=True, node_color='#A5D6A7', edge_color='gray', ax=ax)
                     st.pyplot(fig)
                     plt.close(fig)
+                    st.write("DEBUG: 2D visualization rendered for Log-Cycle")
 
-                    # Premium 3D
+                    # 3D Visualization
+                    pos_3d = nx.spring_layout(G, dim=3, seed=42)
+                    x = [pos_3d[p][0] for p in points]
+                    y = [pos_3d[p][1] for p in points]
+                    z = [pos_3d[p][2] for p in points]
+                    fig_3d = go.Figure(data=[
+                        go.Scatter3d(x=x, y=y, z=z, mode='markers+lines', marker=dict(size=8, color='#A5D6A7'))
+                    ])
+                    fig_3d.update_layout(title="3D Log-Cycle", scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))
+                    st.plotly_chart(fig_3d)
+                    st.write("DEBUG: 3D visualization rendered for Log-Cycle")
+
+                    # Report (Premium only)
                     if st.session_state.get("razorpay_payment_id"):
-                        pos_3d = nx.spring_layout(G, dim=3, seed=42)
-                        x = [pos_3d[p][0] for p in points]
-                        y = [pos_3d[p][1] for p in points]
-                        z = [pos_3d[p][2] for p in points]
-                        fig_3d = go.Figure(data=[
-                            go.Scatter3d(x=x, y=y, z=z, mode='markers+lines', marker=dict(size=8, color='#A5D6A7'))
-                        ])
-                        st.plotly_chart(fig_3d)
-
-                        # Report
                         report = f"""LIG Visualization Report
 Structure: {structure_type}
 Function: {func_choice}
 Points: {points}
 Max Distance: {max(distances, default=0):.3f}"""
                         st.download_button("Download Report", report, "lig_report.txt", mime="text/plain")
+                        st.write("DEBUG: Report download button rendered for Log-Cycle")
+                    else:
+                        st.info("Upgrade to Premium to download reports.")
+                        st.write("DEBUG: Premium report prompt displayed for Log-Cycle")
 
-            elif structure_type in ["Log-Surface", "Log-Volume"] and st.session_state.get("razorpay_payment_id"):
+            elif structure_type in ["Log-Surface", "Log-Volume"]:
                 if structure_type == "Log-Surface":
                     points, _, _ = generate_log_surface(c_values[0], c_values[1], func, f2)
                     title = "3D Log-Surface"
@@ -287,18 +330,26 @@ Max Distance: {max(distances, default=0):.3f}"""
                     ])
                     fig_3d.update_layout(title=title, scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))
                     st.plotly_chart(fig_3d)
+                    st.write(f"DEBUG: 3D visualization rendered for {structure_type}")
 
-                    # Report
-                    report = f"""LIG Visualization Report
+                    # Report (Premium only)
+                    if st.session_state.get("razorpay_payment_id"):
+                        report = f"""LIG Visualization Report
 Structure: {structure_type}
 Function: {func_choice}
 Points: {points[:10]}... (total {len(points)})"""
-                    st.download_button("Download Report", report, "lig_report.txt", mime="text/plain")
+                        st.download_button("Download Report", report, "lig_report.txt", mime="text/plain")
+                        st.write(f"DEBUG: Report download button rendered for {structure_type}")
+                    else:
+                        st.info("Upgrade to Premium to download reports.")
+                        st.write(f"DEBUG: Premium report prompt displayed for {structure_type}")
 
         except ValueError as ve:
             st.error(f"Invalid input: {str(ve)}. Please check your constants or weights.")
+            st.write("DEBUG: ValueError caught")
         except Exception as e:
-            st.error(f"An error occurred: {str(e)}. Contact support if this persists.")
+            st.error(f"An error occurred: {str(e)}. Contact support at oceanicmonk@gmail.com.")
+            st.write("DEBUG: General exception caught")
 
 # Payment Form
 with st.form(key="payment_form"):
@@ -306,12 +357,21 @@ with st.form(key="payment_form"):
     user_email = st.text_input("Enter Email for Premium Access", value=st.session_state.get("user_email", ""))
     submitted = st.form_submit_button("Upgrade to Premium", type="secondary")
     if submitted and user_email:
-        subscription = create_razorpay_subscription(user_email, usd_price)
-        if subscription:
-            st.session_state["razorpay_payment_id"] = subscription["id"]
-            st.session_state["user_email"] = user_email
-            st.session_state["trial_count"] = 0
-            st.success("Premium subscription activated! Enjoy unlimited trials and advanced features.")
+        st.write("DEBUG: Payment form submitted")
+        if st.session_state.get("razorpay_client"):
+            subscription = create_razorpay_subscription(user_email, usd_price)
+            if subscription:
+                st.session_state["razorpay_payment_id"] = subscription["id"]
+                st.session_state["user_email"] = user_email
+                st.session_state["trial_count"] = 0
+                st.success("Premium subscription activated! Enjoy unlimited trials and downloadable reports.")
+                st.write("DEBUG: Subscription successful")
+            else:
+                st.error("Failed to create subscription. Please try again or contact support.")
+                st.write("DEBUG: Subscription creation failed")
+        else:
+            st.error("Payment processing unavailable in test mode. Please try again later.")
+            st.write("DEBUG: Payment unavailable due to test mode")
 
 # Handle payment success
 if st.query_params.get("payment_id"):
@@ -333,15 +393,18 @@ if st.query_params.get("payment_id"):
                         f.write(line)
         st.session_state["trial_count"] = 0
         st.success(f"Payment successful! Premium access unlocked with Payment ID: {payment_id}")
+        st.write("DEBUG: Payment success handled")
     except Exception as e:
         st.error(f"Error updating trial count: {e}")
+        st.write("DEBUG: Error in payment success handling")
 
 # Footer
 st.markdown("""
 <div class="footer">
     © 2025 LIG Visualization Tool | 
-    <a href="/contact">Contact</a> | 
-    <a href="/privacy_policy">Privacy Policy</a> | 
-    <a href="/terms">Terms</a>
+    <a href="https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/contact">Contact</a> | 
+    <a href="https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/privacy_policy">Privacy Policy</a> | 
+    <a href="https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/terms">Terms</a> | 
+    <a href="https://oceanicmonk-lig-visualization-tool-app-bxe29c.streamlit.app/refund_policy">Refund Policy</a>
 </div>
 """, unsafe_allow_html=True)
