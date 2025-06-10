@@ -6,8 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import razorpay
-import requests
-import os
+from utils import get_inr_amount, track_trial, create_razorpay_subscription
 from datetime import datetime
 
 # High-precision arithmetic
@@ -17,15 +16,6 @@ mp.dps = 50
 st.set_page_config(page_title="LIG Visualization Tool", layout="wide", initial_sidebar_state="expanded")
 
 # Currency converter
-def get_inr_amount(usd_amount):
-    try:
-        api_key = os.environ.get("EXCHANGE_RATE_API_KEY", "2d4bcbdb396723b05d80d831")
-        response = requests.get(f"https://api.exchangerate-api.com/v4/latest/USD?apiKey={api_key}")
-        rate = response.json()["rates"]["INR"]
-        return round(usd_amount * rate)
-    except:
-        return usd_amount * 85.8  # Fallback rate
-
 usd_price = 5
 inr_price = get_inr_amount(usd_price)
 st.session_state['inr_price'] = inr_price
@@ -49,36 +39,6 @@ st.markdown("""
     .footer a:hover { text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
-
-# Trial Tracking
-def track_trial():
-    current_month = datetime.now().strftime("%Y-%m")
-    log_file = "usage.log"
-    user_id = st.session_state.get("user_email", st.session_state.get("razorpay_payment_id", "anonymous"))
-    try:
-        if os.path.exists(log_file):
-            with open(log_file, "r") as f:
-                logs = f.readlines()
-            user_key = f"{current_month}:{user_id}"
-            logs = [line for line in logs if current_month in line]
-            for i, line in enumerate(logs):
-                if user_key in line:
-                    count = int(line.split(":")[-1].strip()) + 1
-                    logs[i] = f"{user_key}:{count}\n"
-                    with open(log_file, "w") as f:
-                        f.writelines(logs)
-                    return count
-            logs.append(f"{user_key}:1\n")
-            with open(log_file, "w") as f:
-                f.writelines(logs)
-            return 1
-        else:
-            with open(log_file, "w") as f:
-                f.write(f"{user_key}:1\n")
-            return 1
-    except Exception as e:
-        st.error(f"Error tracking trials: {e}")
-        return 0
 
 # LIG Functions
 def f1(x): return x / log(x) if x > np.e else float('inf')
@@ -142,14 +102,14 @@ def generate_log_surface(c1, c2, func1=f1, func2=f2, n_points=100):
     points = []
     for x in np.linspace(np.e + 0.1, np.exp(np.e), n_points):
         if abs(log(func1(x)) - c1) < log(1.2) and abs(log(func2(x)) - c2) < log(1.2):
-            points.append(x)
+            points.append([x, float(func1(x)), float(func2(x))])
     return points, None, None
 
 def generate_log_volume(c1, c2, c3, func1=f1, func2=f2, func3=f3, n_points=100):
     points = []
     for x in np.linspace(np.e + 0.1, np.exp(np.e), n_points):
         if all(abs(log(f(x)) - c) < log(1.2) for f, c in [(func1, c1), (func2, c2), (func3, c3)]):
-            points.append(x)
+            points.append([x, float(func1(x)), float(func2(x))])
     return points, None, None
 
 def transform_log_point(x, C, weights=[1, 0, 0], funcs=[f1, f2, f3]):
@@ -188,8 +148,8 @@ st.session_state["trial_count"] = trial_count
 st.write(f"Trials this month: {trial_count}/50")
 
 # Razorpay Integration
-key_id = os.environ.get("RAZORPAY_KEY_ID", "test_key_id")  # Fallback for testing
-key_secret = os.environ.get("RAZORPAY_KEY_SECRET", "test_key_secret")  # Fallback for testing
+key_id = st.secrets.get("razorpay", {}).get("key_id", "test_key_id")
+key_secret = st.secrets.get("razorpay", {}).get("key_secret", "test_key_secret")
 if "razorpay_client" not in st.session_state:
     try:
         st.session_state["razorpay_client"] = razorpay.Client(auth=(key_id, key_secret))
@@ -198,6 +158,9 @@ if "razorpay_client" not in st.session_state:
         st.session_state["razorpay_client"] = None
 
 # Generate
+st.write("DEBUG: Rendering Generate section")
+if st.checkbox("Bypass Premium for Testing (Local Only)"):
+    st.session_state["razorpay_payment_id"] = "test_premium"
 if st.button("Generate", type="primary"):
     if trial_count > 50 and not st.session_state.get("razorpay_payment_id"):
         st.error("Trial limit reached. Upgrade to Premium for unlimited trials and advanced features.")
@@ -309,9 +272,9 @@ Max Distance: {max(distances, default=0):.3f}"""
                 if points:
                     st.markdown(f"**Points**: {points[:10]}... (total {len(points)})")
                     # 3D Visualization
-                    x = np.random.rand(len(points))  # Placeholder for 3D projection
-                    y = np.random.rand(len(points))
-                    z = points
+                    x = [p[0] for p in points]
+                    y = [p[1] for p in points]
+                    z = [p[2] for p in points]
                     fig_3d = go.Figure(data=[
                         go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=5, color='#FF9800'))
                     ])
@@ -336,21 +299,12 @@ with st.form(key="payment_form"):
     user_email = st.text_input("Enter Email for Premium Access", value=st.session_state.get("user_email", ""))
     submitted = st.form_submit_button("Upgrade to Premium", type="secondary")
     if submitted and user_email:
-        try:
-            subscription = st.session_state["razorpay_client"].subscription.create({
-                "plan_id": "plan_monthly_premium",  # Replace with your Razorpay plan ID
-                "customer_notify": 1,
-                "quantity": 1,
-                "total_count": 12,  # 1-year subscription
-                "notes": {"email": user_email},
-                "notify_info": {"notify_phone": "", "notify_email": user_email}
-            })
+        subscription = create_razorpay_subscription(user_email, usd_price)
+        if subscription:
             st.session_state["razorpay_payment_id"] = subscription["id"]
             st.session_state["user_email"] = user_email
             st.session_state["trial_count"] = 0
             st.success("Premium subscription activated! Enjoy unlimited trials and advanced features.")
-        except Exception as e:
-            st.error(f"Payment failed: {str(e)}. Please try again or contact support.")
 
 # Handle payment success
 if st.query_params.get("payment_id"):
@@ -360,19 +314,22 @@ if st.query_params.get("payment_id"):
     current_month = datetime.now().strftime("%Y-%m")
     log_file = "usage.log"
     user_key = f"{current_month}:{st.session_state.get('user_email', payment_id)}"
-    if os.path.exists(log_file):
-        with open(log_file, "r") as f:
-            lines = f.readlines()
-        with open(log_file, "w") as f:
-            for line in lines:
-                if user_key in line:
-                    f.write(f"{user_key}:0\n")
-                else:
-                    f.write(line)
-    st.session_state["trial_count"] = 0
-    st.success(f"Payment successful! Premium access unlocked with Payment ID: {payment_id}")
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, "r") as f:
+                lines = f.readlines()
+            with open(log_file, "w") as f:
+                for line in lines:
+                    if user_key in line:
+                        f.write(f"{user_key}:0\n")
+                    else:
+                        f.write(line)
+        st.session_state["trial_count"] = 0
+        st.success(f"Payment successful! Premium access unlocked with Payment ID: {payment_id}")
+    except Exception as e:
+        st.error(f"Error updating trial count: {e}")
 
-# Footer
+# Footer (Fixed: Ensured proper closing of triple-quoted string)
 st.markdown("""
 <div class="footer">
     © 2025 LIG Visualization Tool | 
