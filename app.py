@@ -6,6 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import razorpay
+import os
 from utils import get_inr_amount, track_trial, create_razorpay_subscription
 from datetime import datetime
 
@@ -148,13 +149,19 @@ st.session_state["trial_count"] = trial_count
 st.write(f"Trials this month: {trial_count}/50")
 
 # Razorpay Integration
-key_id = st.secrets.get("razorpay", {}).get("key_id", "test_key_id")
-key_secret = st.secrets.get("razorpay", {}).get("key_secret", "test_key_secret")
+try:
+    key_id = st.secrets["razorpay"]["key_id"]
+    key_secret = st.secrets["razorpay"]["key_secret"]
+except (KeyError, AttributeError):
+    st.warning("Razorpay secrets not found in .streamlit/secrets.toml. Using test keys for local testing.")
+    key_id = "test_key_id"
+    key_secret = "test_key_secret"
+
 if "razorpay_client" not in st.session_state:
     try:
         st.session_state["razorpay_client"] = razorpay.Client(auth=(key_id, key_secret))
-    except:
-        st.warning("Razorpay configuration is missing. Running in test mode (no payments).")
+    except Exception as e:
+        st.warning(f"Failed to initialize Razorpay: {str(e)}. Running in test mode (no payments).")
         st.session_state["razorpay_client"] = None
 
 # Generate
@@ -329,7 +336,7 @@ if st.query_params.get("payment_id"):
     except Exception as e:
         st.error(f"Error updating trial count: {e}")
 
-# Footer (Fixed: Ensured proper closing of triple-quoted string)
+# Footer
 st.markdown("""
 <div class="footer">
     © 2025 LIG Visualization Tool | 
